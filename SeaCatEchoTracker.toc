@@ -18,6 +18,6 @@
 ## X-Category: Combat
 ## X-Website: https://github.com/zhuty999-gh/SeaCatEchoTracker
 ## X-Credits: Original addon by Lazoro (MIT)
-## IconTexture: Interface\Icons\Spell_Evoker_Echo
+## IconTexture: 4622456
 
 SeaCatEchoTracker.lua
