@@ -1,0 +1,23 @@
+## Interface: 120100, 120001, 120000
+## Title: SeaCat Echo Tracker
+## Title-zhCN: 海毛虫Echo Tracker
+## Title-zhTW: 海毛蟲Echo Tracker
+## Author: zhuty999
+## Version: 1.0.0
+## Notes: Tracks the earliest Echo's remaining duration and radial timer for Preservation Evoker. Because 12.1 makes aura data secret in combat, state is inferred from your own cast sequence instead of read from auras. Based on EchoTracker by Lazoro.
+## Notes-zhCN: 为恢复系唤魔人追踪最早一个 Echo 的剩余时间与环形计时。由于 12.1 在战斗中将光环数据保密，插件改为根据你自己的施法序列推算，而非读取光环。基于 Lazoro 的 EchoTracker。
+## Notes-zhTW: 為恢復系喚魔人追蹤最早一個 Echo 的剩餘時間與環形計時。由於 12.1 在戰鬥中將光環資料保密，插件改為根據你自己的施法序列推算，而非讀取光環。基於 Lazoro 的 EchoTracker。
+## Notes-deDE: Verfolgt eure Echo-Buffs mit Lokalisierungsunterstützung
+## Notes-frFR: Suit vos buffs Echo avec prise en charge multilingue
+## Notes-esES: Rastrea tus beneficios de Eco con soporte multilenguaje
+## Notes-esMX: Rastrea tus beneficios de Eco con soporte multilenguaje
+
+## SavedVariables: SeaCatEchoTrackerDB, EchoTrackerDB
+## License: MIT
+## Category: Combat
+## X-Category: Combat
+## X-Website: https://github.com/zhuty999/SeaCatEchoTracker
+## X-Credits: Original addon by Lazoro (MIT)
+## IconTexture: Interface\Icons\Spell_Evoker_Echo
+
+SeaCatEchoTracker.lua
