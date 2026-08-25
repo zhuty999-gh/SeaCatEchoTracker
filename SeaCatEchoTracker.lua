@@ -677,6 +677,10 @@ elseif locale == "zhCN" then
     ["Grants an extra Echo target"] = "使下一个 Echo 多一个目标",
     ["stacks max"] = "层上限",
     ["Default"] = "默认",
+    ["Open Settings"] = "打开设置",
+    ["Settings open in their own movable window, so you can drag them aside and watch the tracker update as you make changes."] = "设置会在独立的可拖动窗口中打开，你可以把它拖到一边，边调边看追踪器的实时变化。",
+    ["same as /sce, if you prefer the full name"] = "与 /sce 等价，喜欢完整命令的话可以用它",
+    ["Also reachable from ESC > Options > AddOns."] = "也可以从 ESC > 选项 > 插件 中打开。",
   })
 elseif locale == "zhTW" then
   AddTranslations({
@@ -764,6 +768,10 @@ elseif locale == "zhTW" then
     ["Grants an extra Echo target"] = "使下一個 Echo 多一個目標",
     ["stacks max"] = "層上限",
     ["Default"] = "預設",
+    ["Open Settings"] = "開啟設定",
+    ["Settings open in their own movable window, so you can drag them aside and watch the tracker update as you make changes."] = "設定會在獨立的可拖曳視窗中開啟，你可以把它拖到一邊，邊調邊看追蹤器的即時變化。",
+    ["same as /sce, if you prefer the full name"] = "與 /sce 等價，喜歡完整指令的話可以用它",
+    ["Also reachable from ESC > Options > AddOns."] = "也可以從 ESC > 選項 > 插件 中開啟。",
   })
 end
 
@@ -3090,11 +3098,49 @@ else
   minimapButton:Show()
 end
 
+-- ESC > Options > AddOns entry. The options panel is a standalone movable frame
+-- so it can be dragged aside while previewing changes on the tracker, which the
+-- settings canvas cannot do; the category therefore hosts a button that opens it
+-- rather than reparenting the panel into the canvas.
+if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
+  local host = CreateFrame("Frame")
+  host.name = "SeaCat Echo Tracker"
+  -- The settings canvas resizes this on display, but it starts at zero size and
+  -- a zero-width parent would collapse the wrapped blurb below into nothing.
+  host:SetSize(600, 400)
+
+  local title = host:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+  title:SetPoint("TOPLEFT", 16, -16)
+  title:SetText(L["Echo Tracker"])
+
+  local blurb = host:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+  blurb:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+  blurb:SetPoint("RIGHT", host, "RIGHT", -16, 0)
+  blurb:SetJustifyH("LEFT")
+  blurb:SetText(L["Settings open in their own movable window, so you can drag them aside and watch the tracker update as you make changes."])
+
+  local open = CreateFrame("Button", nil, host, "UIPanelButtonTemplate")
+  open:SetSize(180, 24)
+  open:SetPoint("TOPLEFT", blurb, "BOTTOMLEFT", 0, -16)
+  open:SetText(L["Open Settings"])
+  open:SetScript("OnClick", function()
+    if SettingsPanel and SettingsPanel:IsShown() then
+      HideUIPanel(SettingsPanel)
+    end
+    panel:Show()
+  end)
+
+  local category = Settings.RegisterCanvasLayoutCategory(host, host.name)
+  category.ID = host.name
+  Settings.RegisterAddOnCategory(category)
+end
+
 -- /et is kept for muscle memory from the original addon. If both are installed
 -- the later one wins that alias, which is why /sce exists as the unambiguous one.
 SLASH_SEACATECHOTRACKER1 = "/sce"
 SLASH_SEACATECHOTRACKER2 = "/seacatecho"
-SLASH_SEACATECHOTRACKER3 = "/et"
+SLASH_SEACATECHOTRACKER3 = "/seacatechotracker"
+SLASH_SEACATECHOTRACKER4 = "/et"
 
 SlashCmdList["SEACATECHOTRACKER"] = function(msg)
   msg = string.lower((msg or ""):match("^%s*(.-)%s*$") or "")
@@ -3196,7 +3242,9 @@ SlashCmdList["SEACATECHOTRACKER"] = function(msg)
   print("|cff70C0F5/sce lock|r - " .. L["lock tracker frame"])
   print("|cff70C0F5/sce reset|r - " .. L["reset settings to defaults"])
   print("|cff70C0F5/sce spells|r - " .. L["show spell table self-check"])
+  print("|cff70C0F5/seacatechotracker|r - " .. L["same as /sce, if you prefer the full name"])
   print("|cff70C0F5" .. L["Alerts"] .. "|r " .. L["Alerts are configurable in the Alerts tab."])
+  print("|cff70C0F5" .. L["Echo Tracker"] .. "|r " .. L["Also reachable from ESC > Options > AddOns."])
 end
 local startupRefresh = CreateFrame("Frame")
 startupRefresh:RegisterEvent("PLAYER_LOGIN")

@@ -68,7 +68,7 @@ under default settings.
 
 | Command | Effect |
 | --- | --- |
-| `/sce` | Toggle settings |
+| `/sce` or `/seacatechotracker` | Toggle settings |
 | `/sce spells` | Print the spell table with resolved names, to verify IDs |
 | `/sce show` / `/sce hide` | Toggle always-show |
 | `/sce unlock` / `/sce lock` | Move the tracker |
@@ -76,6 +76,12 @@ under default settings.
 
 `/seacatecho` and `/et` are equivalent aliases; the latter is there for muscle
 memory from the original addon.
+
+The settings are also listed under **ESC → Options → AddOns**, if you would
+rather not remember a slash command at all. The entry there opens the same
+window: it is deliberately a separate movable window rather than embedded in the
+options canvas, so you can drag it aside and watch the tracker update live while
+you adjust sizes and colors.
 
 `/sce spells` is worth running once after any class patch: it resolves every
 configured spell ID to its live name, so a renumbered spell shows up immediately
