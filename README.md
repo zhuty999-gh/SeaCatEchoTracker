@@ -82,8 +82,24 @@ instead of silently breaking the tracker.
 
 Drop the `SeaCatEchoTracker` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 
-Settings are imported once from the original addon's `EchoTrackerDB` if you have
-it, so switching over keeps your layout.
+### Coming from the original EchoTracker
+
+Globals and SavedVariables were renamed so both addons can be installed at once
+without fighting over settings. That rename means your old layout does not carry
+over automatically in the general case, because WoW stores saved variables per
+addon *folder*: yours live in `SavedVariables\EchoTracker.lua`, and this addon
+reads `SavedVariables\SeaCatEchoTracker.lua`.
+
+Two ways to keep your settings:
+
+- **Run both addons enabled once.** With the original still installed and enabled,
+  its `EchoTrackerDB` is in scope, and this addon imports it on first load. Then
+  disable or remove the original.
+- **Copy the file by hand.** With the game closed, copy
+  `WTF\Account\<id>\SavedVariables\EchoTracker.lua` to `SeaCatEchoTracker.lua` in
+  the same folder and rename `EchoTrackerDB` to `SeaCatEchoTrackerDB` inside it.
+
+Starting fresh is also fine — there are only a handful of settings.
 
 ## License
 
