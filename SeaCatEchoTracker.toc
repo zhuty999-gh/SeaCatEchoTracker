@@ -12,7 +12,7 @@
 ## Notes-esES: Rastrea tus beneficios de Eco con soporte multilenguaje
 ## Notes-esMX: Rastrea tus beneficios de Eco con soporte multilenguaje
 
-## SavedVariables: SeaCatEchoTrackerDB, EchoTrackerDB
+## SavedVariables: SeaCatEchoTrackerDB
 ## License: MIT
 ## Category: Combat
 ## X-Category: Combat

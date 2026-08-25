@@ -3,8 +3,12 @@ local addonName, ns = ...
 SeaCatEchoTrackerDB = SeaCatEchoTrackerDB or {}
 
 -- One-time import from the upstream addon (Lazoro's EchoTracker), so anyone
--- switching over keeps their layout instead of reconfiguring from scratch. Both
--- names are declared in the .toc, but only ours is ever written back.
+-- switching over keeps their layout instead of reconfiguring from scratch.
+--
+-- EchoTrackerDB is deliberately NOT declared in our .toc. Claiming another
+-- addon's saved variable stopped our own from being restored at load. The
+-- global is still readable here when the original addon is installed, because
+-- "EchoTracker" sorts before "SeaCatEchoTracker" and so loads first.
 if not next(SeaCatEchoTrackerDB) and type(EchoTrackerDB) == "table" and next(EchoTrackerDB) then
   local function deepCopy(src)
     local out = {}
@@ -110,7 +114,6 @@ if locale == "deDE" then
     ["Always Show"] = "Immer anzeigen",
     ["Minimap"] = "Minikarte",
     ["Hide Minimap Button"] = "Minikarten-Schaltfläche ausblenden",
-    ["Minimap Distance"] = "Minikarten-Abstand",
     ["Tip: drag the minimap button to reposition it."] = "Tipp: Ziehe den Minikartenknopf, um ihn neu zu positionieren.",
     ["Font"] = "Schriftart",
     ["Colors"] = "Farben",
@@ -181,7 +184,6 @@ elseif locale == "frFR" then
     ["Always Show"] = "Toujours afficher",
     ["Minimap"] = "Mini-carte",
     ["Hide Minimap Button"] = "Masquer le bouton de la mini-carte",
-    ["Minimap Distance"] = "Distance de la mini-carte",
     ["Tip: drag the minimap button to reposition it."] = "Astuce : faites glisser le bouton de la mini-carte pour le repositionner.",
     ["Font"] = "Police",
     ["Colors"] = "Couleurs",
@@ -252,7 +254,6 @@ elseif locale == "esES" or locale == "esMX" then
     ["Always Show"] = "Mostrar siempre",
     ["Minimap"] = "Minimapa",
     ["Hide Minimap Button"] = "Ocultar botón del minimapa",
-    ["Minimap Distance"] = "Distancia del minimapa",
     ["Tip: drag the minimap button to reposition it."] = "Consejo: arrastra el botón del minimapa para recolocarlo.",
     ["Font"] = "Fuente",
     ["Colors"] = "Colores",
@@ -323,7 +324,6 @@ elseif locale == "itIT" then
     ["Always Show"] = "Mostra sempre",
     ["Minimap"] = "Minimappa",
     ["Hide Minimap Button"] = "Nascondi pulsante minimappa",
-    ["Minimap Distance"] = "Distanza minimappa",
     ["Tip: drag the minimap button to reposition it."] = "Suggerimento: trascina il pulsante della minimappa per riposizionarlo.",
     ["Font"] = "Carattere",
     ["Colors"] = "Colori",
@@ -394,7 +394,6 @@ elseif locale == "ptBR" then
     ["Always Show"] = "Sempre mostrar",
     ["Minimap"] = "Minimapa",
     ["Hide Minimap Button"] = "Ocultar botão do minimapa",
-    ["Minimap Distance"] = "Distância do minimapa",
     ["Tip: drag the minimap button to reposition it."] = "Dica: arraste o botão do minimapa para reposicioná-lo.",
     ["Font"] = "Fonte",
     ["Colors"] = "Cores",
@@ -465,7 +464,6 @@ elseif locale == "ruRU" then
     ["Always Show"] = "Показывать всегда",
     ["Minimap"] = "Миникарта",
     ["Hide Minimap Button"] = "Скрыть кнопку у миникарты",
-    ["Minimap Distance"] = "Расстояние от миникарты",
     ["Tip: drag the minimap button to reposition it."] = "Подсказка: перетащите кнопку у миникарты, чтобы изменить её положение.",
     ["Font"] = "Шрифт",
     ["Colors"] = "Цвета",
@@ -536,7 +534,6 @@ elseif locale == "koKR" then
     ["Always Show"] = "항상 표시",
     ["Minimap"] = "미니맵",
     ["Hide Minimap Button"] = "미니맵 버튼 숨기기",
-    ["Minimap Distance"] = "미니맵 거리",
     ["Tip: drag the minimap button to reposition it."] = "팁: 미니맵 버튼을 드래그해 위치를 바꾸세요.",
     ["Font"] = "글꼴",
     ["Colors"] = "색상",
@@ -607,7 +604,6 @@ elseif locale == "zhCN" then
     ["Always Show"] = "始终显示",
     ["Minimap"] = "小地图",
     ["Hide Minimap Button"] = "隐藏小地图按钮",
-    ["Minimap Distance"] = "小地图距离",
     ["Tip: drag the minimap button to reposition it."] = "提示：拖动小地图按钮来重新定位。",
     ["Font"] = "字体",
     ["Colors"] = "颜色",
@@ -698,7 +694,6 @@ elseif locale == "zhTW" then
     ["Always Show"] = "永遠顯示",
     ["Minimap"] = "小地圖",
     ["Hide Minimap Button"] = "隱藏小地圖按鈕",
-    ["Minimap Distance"] = "小地圖距離",
     ["Tip: drag the minimap button to reposition it."] = "提示：拖曳小地圖按鈕來重新定位。",
     ["Font"] = "字型",
     ["Colors"] = "顏色",
@@ -800,8 +795,8 @@ local FONT_OPTIONS = {
 local defaults = {
   point = "CENTER",
   relativePoint = "CENTER",
-  x = 430,
-  y = -250,
+  x = 0,
+  y = 0,
 
   frameSize = 64,
 
@@ -817,6 +812,8 @@ local defaults = {
   timerOffsetY = 3,
 
   fontPath = STANDARD_TEXT_FONT,
+
+  radialOpacity = 50,
 
   unlocked = false,
   alwaysShow = false,
@@ -1256,7 +1253,7 @@ local function SetRadialCooldown(cooldownFrame, startTime, duration, remaining)
     cooldownFrame:SetHideCountdownNumbers(true)
   end
 
-  local baseAlpha = math.max(0, math.min(1, (SeaCatEchoTrackerDB.radialOpacity or 88) / 100))
+  local baseAlpha = math.max(0, math.min(1, (SeaCatEchoTrackerDB.radialOpacity or defaults.radialOpacity) / 100))
   local swipeAlpha = baseAlpha
 
   if SeaCatEchoTrackerDB.radialFade ~= false and duration and duration > 0 and remaining ~= nil then
@@ -1780,9 +1777,6 @@ local function RefreshControls()
   if controls.timerOffsetYSlider and controls.timerOffsetYSlider.refresh then
     controls.timerOffsetYSlider.refresh()
   end
-  if controls.minimapRadiusSlider and controls.minimapRadiusSlider.refresh then
-    controls.minimapRadiusSlider.refresh()
-  end
   if controls.radialOpacitySlider and controls.radialOpacitySlider.refresh then
     controls.radialOpacitySlider.refresh()
   end
@@ -1906,13 +1900,32 @@ frame:SetScript("OnDragStart", function(self)
   end
 end)
 
+-- StartMoving re-anchors the frame to whichever corner it likes (TOPLEFT in
+-- practice), so storing GetPoint() verbatim saves a TOPLEFT offset under keys
+-- that everything else reads as CENTER-relative. Converting back to a CENTER
+-- offset keeps every stored position in one coordinate space.
+local function SaveFramePosition()
+  if not frame then
+    return
+  end
+
+  local fx, fy = frame:GetCenter()
+  local ux, uy = UIParent:GetCenter()
+  if not fx or not ux then
+    return
+  end
+
+  local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+
+  SeaCatEchoTrackerDB.point = "CENTER"
+  SeaCatEchoTrackerDB.relativePoint = "CENTER"
+  SeaCatEchoTrackerDB.x = fx * scale - ux
+  SeaCatEchoTrackerDB.y = fy * scale - uy
+end
+
 frame:SetScript("OnDragStop", function(self)
   self:StopMovingOrSizing()
-  local point, _, relativePoint, x, y = self:GetPoint()
-  SeaCatEchoTrackerDB.point = point
-  SeaCatEchoTrackerDB.relativePoint = relativePoint
-  SeaCatEchoTrackerDB.x = x
-  SeaCatEchoTrackerDB.y = y
+  SaveFramePosition()
 end)
 
 frame.icon = frame:CreateTexture(nil, "BACKGROUND")
@@ -2400,7 +2413,16 @@ end)
 
 -- Consume only ESCAPE; every other key has to keep reaching the game or all
 -- keybinds break while the panel is open.
+--
+-- SetPropagateKeyboardInput is protected in combat, so calling it here while
+-- locked down raises ADDON_ACTION_BLOCKED and taints whatever runs next. In
+-- combat we skip the call and let every key through, which costs only the
+-- ability to close the panel with ESCAPE until combat ends.
 panel:SetScript("OnKeyDown", function(self, key)
+  if InCombatLockdown() then
+    return
+  end
+
   if key == "ESCAPE" then
     self:SetPropagateKeyboardInput(false)
     self:Hide()
@@ -2503,7 +2525,9 @@ end)
 EnsurePulseAnimation(panelPreview.frame)
 
 panel:SetScript("OnShow", function(self)
-  self:SetPropagateKeyboardInput(true)
+  if not InCombatLockdown() then
+    self:SetPropagateKeyboardInput(true)
+  end
   UpdatePanelPreview()
   SelectTab(SeaCatEchoTrackerDB.lastTab or "general")
 end)
@@ -2582,24 +2606,8 @@ controls.hideMinimapCheck:SetScript("OnClick", function(self)
   end
 end)
 
-controls.minimapRadiusSlider = CreateCenteredNumberSlider(
-  "SeaCatEchoTrackerMinimapRadiusSlider",
-  generalPage,
-  L["Minimap Distance"],
-  -308,
-  80,
-  145,
-  function()
-    return SeaCatEchoTrackerDB.minimap.radius
-  end,
-  function(v)
-    SeaCatEchoTrackerDB.minimap.radius = v
-    UpdateMinimapButtonPosition()
-  end
-)
-
 local minimapHelp = generalPage:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-minimapHelp:SetPoint("TOP", 0, -378)
+minimapHelp:SetPoint("TOP", 0, -284)
 minimapHelp:SetText(L["Tip: drag the minimap button to reposition it."])
 minimapHelp:SetTextColor(0.72, 0.72, 0.72)
 
@@ -2657,7 +2665,7 @@ controls.radialOpacitySlider = CreateCenteredNumberSlider(
   0,
   100,
   function()
-    return SeaCatEchoTrackerDB.radialOpacity or 88
+    return SeaCatEchoTrackerDB.radialOpacity or defaults.radialOpacity
   end,
   function(v)
     SeaCatEchoTrackerDB.radialOpacity = v
@@ -3234,6 +3242,27 @@ SlashCmdList["SEACATECHOTRACKER"] = function(msg)
     return
   end
 
+  -- Diagnostic for position problems: prints what is stored against where the
+  -- frame actually sits, so a mismatch tells you whether the save or the restore
+  -- is at fault.
+  if msg == "pos" then
+    local point, relativeTo, relativePoint, x, y = frame:GetPoint()
+    print("|cff70C0F5SeaCat|r stored: " .. tostring(SeaCatEchoTrackerDB.point)
+      .. " / " .. tostring(SeaCatEchoTrackerDB.relativePoint)
+      .. " x=" .. tostring(SeaCatEchoTrackerDB.x)
+      .. " y=" .. tostring(SeaCatEchoTrackerDB.y))
+    print("|cff70C0F5SeaCat|r live:   " .. tostring(point)
+      .. " / " .. tostring(relativePoint)
+      .. " x=" .. tostring(x)
+      .. " y=" .. tostring(y)
+      .. " anchor=" .. tostring(relativeTo and relativeTo:GetName() or relativeTo))
+    print("|cff70C0F5SeaCat|r scale:  frame=" .. tostring(frame:GetScale())
+      .. " effective=" .. tostring(frame:GetEffectiveScale())
+      .. " uiparent=" .. tostring(UIParent:GetScale())
+      .. " points=" .. tostring(frame:GetNumPoints()))
+    return
+  end
+
   print("|cff70C0F5SeaCat Echo Tracker|r " .. L["commands:"])
   print("|cff70C0F5/sce|r - " .. L["toggle settings"])
   print("|cff70C0F5/sce show|r - " .. L["enable always show"])
@@ -3284,4 +3313,13 @@ startupRefresh:SetScript("OnEvent", function(self, event)
   if event == "PLAYER_ENTERING_WORLD" then
     self:UnregisterEvent("PLAYER_ENTERING_WORLD")
   end
+end)
+
+-- OnDragStop is the primary way the position is stored, but it only runs if the
+-- drag ends cleanly on the frame. Capturing the live anchor at logout means what
+-- you see when you reload is what you get back, whatever happened during the drag.
+local positionSaver = CreateFrame("Frame")
+positionSaver:RegisterEvent("PLAYER_LOGOUT")
+positionSaver:SetScript("OnEvent", function()
+  SaveFramePosition()
 end)
