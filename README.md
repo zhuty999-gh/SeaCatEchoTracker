@@ -3,9 +3,9 @@
 海毛虫Echo Tracker — an Echo tracker for Preservation Evoker that still works in
 World of Warcraft **12.1 (Midnight)**.
 
-A fork of [Lazoro's EchoTracker](https://github.com/) (MIT). The UI is largely
-his; the tracking mechanism has been rewritten, because the original approach
-stopped working entirely in 12.1.
+A fork of **EchoTracker by Lazoro** (MIT). The UI is largely his; the tracking
+mechanism has been rewritten, because the original approach stopped working
+entirely in 12.1.
 
 ## Why this fork exists
 
