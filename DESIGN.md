@@ -64,7 +64,7 @@ CreateFrame("AuraContainer", nil, parent, "CustomAuraContainerTemplate")
 - 监听 `UNIT_AURA`（12.1 起载荷完全 secret）
 - 从已绑定原生 setter 的 widget 上 `GetText()` / `GetWidth()` 读回数值
 
-唯一例外是**战斗外校准**（见第 4 节），它必须由 `C_RestrictedActions` 明确确认限制未生效时才执行。
+唯一例外是**战斗外校准**（见第 5 节），它必须由 `C_RestrictedActions` 明确确认限制未生效时才执行。
 
 ## 3. 机制事实与法术表
 
@@ -140,23 +140,6 @@ OnUpdate (节流 0.1s)
     └─ 移除已过期条目，渲染最早到期的剩余时间
 ```
 
-### 3.2 事件流
-
-```
-UNIT_SPELLCAST_SENT  (unit == "player")
-    └─ 记下 castGUID → target 的映射（SUCCEEDED 不带目标，必须在这里存）
-
-UNIT_SPELLCAST_SUCCEEDED  (unit == "player")
-    ├─ spellID == ECHO_SPELL_ID
-    │     └─ echoes[target] = { expiry = now + ECHO_DURATION, castAt = now }
-    │
-    └─ spellID ∈ 消耗列表
-          └─ 按策略移除一个或多个 echoes 条目
-
-OnUpdate (节流 0.1s)
-    └─ 清掉 expiry <= now 的条目，渲染剩余时间
-```
-
 `UNIT_SPELLCAST_SENT` 的参数顺序和 `SUCCEEDED` 不同，这是个容易写错的地方：
 
 ```
@@ -168,25 +151,25 @@ WilduTools 用重命名参数的方式处理这个差异（`gcd_history.lua:545-
 
 另外 `UNIT_SPELLCAST_SENT` 无法用 `RegisterUnitEvent` 过滤（WilduTools 也是用 `RegisterEvent` 后在 handler 里判断 `unit ~= "player"` 就返回）。
 
-## 4. 战斗外自动校准
+## 5. 战斗外自动校准
 
 这是整个设计里最有价值的一环：**战斗外光环数据是明文的**，所以可以用真实数据反过来校准推算参数，不需要硬编码任何数字。
 
-### 4.1 校准持续时间
+### 5.1 校准持续时间
 
 战斗外施放 Echo 后读一次真实的 `duration`，存进 SavedVariables。这样天赋改动、等级变化、后续平衡调整都自动跟上。
 
 **不要硬编码 Echo 的持续时间。** 当前代码里的 `ECHO_SPELL_ID = 364343` 是可靠的，但持续时间必须靠校准得到，第一次运行前没有可信的默认值。
 
-### 4.2 自学习消耗列表
+### 5.2 自学习消耗列表
 
 同理，哪些法术消耗 Echo 也不该硬编码。战斗外流程：施放某法术前后各读一次真实 Echo 数量，如果减少了，就把该 spellID 记进消耗列表。跑几场日常就能自动学全，而且天然适配后续的技能改动。
 
-### 4.3 自我验证（精度自检）
+### 5.3 自我验证（精度自检）
 
 战斗外可以同时拿到「推算值」和「真实值」，所以能直接算出误差并展示给用户。这让「这个插件准不准」从玄学变成可量化的东西，也是发现消耗规则遗漏的最快途径。
 
-## 5. 精度边界（必须诚实告知用户）
+## 6. 精度边界（必须诚实告知用户）
 
 因为「一起消耗、无例外」，消耗判定不再是启发式——它是确定的。这让精度边界比最初设想的窄得多。
 
@@ -205,7 +188,7 @@ WilduTools 用重命名参数的方式处理这个差异（`gcd_history.lua:545-
 
 结论：这是一个**准确度足够高、且误差方向一致偏保守**的倒计时。所有已知误差都让它「显得比实际更早过期」，对「我该不该续 Echo」这个决策是安全的一侧。
 
-### 5.1 蓄力法术（Dream Breath）
+### 6.1 蓄力法术（Dream Breath）
 
 `355936` 是 empowered 法术。**它的 `UNIT_SPELLCAST_SUCCEEDED` 在按下、开始蓄力的瞬间就触发,而不是松手释放时**（玩家实测）。所以不能在 SUCCEEDED 里处理它——蓄力中途取消会导致 Echo 被误消耗。
 
@@ -224,7 +207,7 @@ UNIT_SPELLCAST_EMPOWER_STOP: unitTarget, castGUID, spellID, complete, interrupte
 
 **曾经的错误结论记录在此以免重复**：`!WilduTools/ui/components/gcd_history.lua` 的注释声称「Empowered spells (Evoker) also look like channels but fire SUCCEEDED on release with no CHANNEL_STOP」。这条注释是不可靠的——该插件从未注册过任何 `UNIT_SPELLCAST_EMPOWER_*` 事件（grep 零匹配）,所以那是作者的推断而非实测。不要再引用它。
 
-## 6. 实现阶段
+## 7. 实现阶段
 
 分三步，每步都能独立跑起来验证。
 
@@ -237,7 +220,7 @@ UNIT_SPELLCAST_EMPOWER_STOP: unitTarget, castGUID, spellID, complete, interrupte
 **阶段三：消耗判定**
 加自学习消耗列表和 per-target 追踪，把「当前有几个 Echo」也做出来。这一步引入误差，需要配合阶段二的自我验证来调。
 
-## 7. 现有代码的复用情况
+## 8. 现有代码的复用情况
 
 `EchoTracker.lua` 里可以整段保留的部分（这些和光环读取无关）：
 
@@ -250,9 +233,9 @@ UNIT_SPELLCAST_EMPOWER_STOP: unitTarget, castGUID, spellID, complete, interrupte
 
 设置面板里有几项在新方案下语义变了，需要复查：警报阈值仍然可用（因为剩余时间重新变成明文了），但「始终显示」和层数相关的显示需要根据阶段三的进度调整。
 
-## 8. 待确认事项
+## 9. 待确认事项
 
-- Echo 的真实持续时间 —— 交由 4.1 的校准流程得到，不猜
-- 消耗 Echo 的法术清单 —— 交由 4.2 的自学习得到，不猜
+- Echo 的真实持续时间 —— 交由 5.1 的校准流程得到，不猜
+- 消耗 Echo 的法术清单 —— 交由 5.2 的自学习得到，不猜
 - 群体治疗一次消耗几个 Echo 的具体规则 —— 需要在战斗外用自我验证观察
 - 显示形态 —— 用户尚未决定（沿用现有图标+环形，还是简化为纯数字）

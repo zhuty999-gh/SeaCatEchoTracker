@@ -1,5 +1,7 @@
 # SeaCat Echo Tracker
 
+English | [简体中文](README.zh-CN.md)
+
 海毛虫Echo Tracker — an Echo tracker for Preservation Evoker that still works in
 World of Warcraft **12.1 (Midnight)**.
 
@@ -72,7 +74,8 @@ under default settings.
 | `/sce unlock` / `/sce lock` | Move the tracker |
 | `/sce reset` | Reset to defaults (keeps the calibrated duration) |
 
-`/et` also works, for muscle memory from the original addon.
+`/seacatecho` and `/et` are equivalent aliases; the latter is there for muscle
+memory from the original addon.
 
 `/sce spells` is worth running once after any class patch: it resolves every
 configured spell ID to its live name, so a renumbered spell shows up immediately
