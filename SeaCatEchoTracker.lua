@@ -114,7 +114,6 @@ if locale == "deDE" then
     ["Always Show"] = "Immer anzeigen",
     ["Minimap"] = "Minikarte",
     ["Hide Minimap Button"] = "Minikarten-Schaltfläche ausblenden",
-    ["Tip: drag the minimap button to reposition it."] = "Tipp: Ziehe den Minikartenknopf, um ihn neu zu positionieren.",
     ["Font"] = "Schriftart",
     ["Colors"] = "Farben",
     ["Count Color"] = "Zählerfarbe",
@@ -184,7 +183,6 @@ elseif locale == "frFR" then
     ["Always Show"] = "Toujours afficher",
     ["Minimap"] = "Mini-carte",
     ["Hide Minimap Button"] = "Masquer le bouton de la mini-carte",
-    ["Tip: drag the minimap button to reposition it."] = "Astuce : faites glisser le bouton de la mini-carte pour le repositionner.",
     ["Font"] = "Police",
     ["Colors"] = "Couleurs",
     ["Count Color"] = "Couleur du compteur",
@@ -254,7 +252,6 @@ elseif locale == "esES" or locale == "esMX" then
     ["Always Show"] = "Mostrar siempre",
     ["Minimap"] = "Minimapa",
     ["Hide Minimap Button"] = "Ocultar botón del minimapa",
-    ["Tip: drag the minimap button to reposition it."] = "Consejo: arrastra el botón del minimapa para recolocarlo.",
     ["Font"] = "Fuente",
     ["Colors"] = "Colores",
     ["Count Color"] = "Color del contador",
@@ -324,7 +321,6 @@ elseif locale == "itIT" then
     ["Always Show"] = "Mostra sempre",
     ["Minimap"] = "Minimappa",
     ["Hide Minimap Button"] = "Nascondi pulsante minimappa",
-    ["Tip: drag the minimap button to reposition it."] = "Suggerimento: trascina il pulsante della minimappa per riposizionarlo.",
     ["Font"] = "Carattere",
     ["Colors"] = "Colori",
     ["Count Color"] = "Colore conteggio",
@@ -394,7 +390,6 @@ elseif locale == "ptBR" then
     ["Always Show"] = "Sempre mostrar",
     ["Minimap"] = "Minimapa",
     ["Hide Minimap Button"] = "Ocultar botão do minimapa",
-    ["Tip: drag the minimap button to reposition it."] = "Dica: arraste o botão do minimapa para reposicioná-lo.",
     ["Font"] = "Fonte",
     ["Colors"] = "Cores",
     ["Count Color"] = "Cor da contagem",
@@ -464,7 +459,6 @@ elseif locale == "ruRU" then
     ["Always Show"] = "Показывать всегда",
     ["Minimap"] = "Миникарта",
     ["Hide Minimap Button"] = "Скрыть кнопку у миникарты",
-    ["Tip: drag the minimap button to reposition it."] = "Подсказка: перетащите кнопку у миникарты, чтобы изменить её положение.",
     ["Font"] = "Шрифт",
     ["Colors"] = "Цвета",
     ["Count Color"] = "Цвет счётчика",
@@ -534,7 +528,6 @@ elseif locale == "koKR" then
     ["Always Show"] = "항상 표시",
     ["Minimap"] = "미니맵",
     ["Hide Minimap Button"] = "미니맵 버튼 숨기기",
-    ["Tip: drag the minimap button to reposition it."] = "팁: 미니맵 버튼을 드래그해 위치를 바꾸세요.",
     ["Font"] = "글꼴",
     ["Colors"] = "색상",
     ["Count Color"] = "카운트 색상",
@@ -604,7 +597,6 @@ elseif locale == "zhCN" then
     ["Always Show"] = "始终显示",
     ["Minimap"] = "小地图",
     ["Hide Minimap Button"] = "隐藏小地图按钮",
-    ["Tip: drag the minimap button to reposition it."] = "提示：拖动小地图按钮来重新定位。",
     ["Font"] = "字体",
     ["Colors"] = "颜色",
     ["Count Color"] = "计数颜色",
@@ -668,7 +660,7 @@ elseif locale == "zhCN" then
     ["Consumes Echo"] = "消耗 Echo 的法术",
     ["friendly target only"] = "仅友方目标",
     ["Also show count outside raids"] = "在团队副本外也显示计数",
-    ["Outside raids Temporal Anomaly often hits fewer than 5, so the count reads high."] = "团队副本外时间异常常常打不满 5 个，计数会偏高。",
+    ["Outside raids the count reads high."] = "副本外时空畸体常打不满 5 人，计数偏高。",
     ["empowered, settled on release"] = "蓄力法术，松手才结算",
     ["Grants an extra Echo target"] = "使下一个 Echo 多一个目标",
     ["stacks max"] = "层上限",
@@ -694,7 +686,6 @@ elseif locale == "zhTW" then
     ["Always Show"] = "永遠顯示",
     ["Minimap"] = "小地圖",
     ["Hide Minimap Button"] = "隱藏小地圖按鈕",
-    ["Tip: drag the minimap button to reposition it."] = "提示：拖曳小地圖按鈕來重新定位。",
     ["Font"] = "字型",
     ["Colors"] = "顏色",
     ["Count Color"] = "計數顏色",
@@ -758,7 +749,7 @@ elseif locale == "zhTW" then
     ["Consumes Echo"] = "消耗 Echo 的法術",
     ["friendly target only"] = "僅友方目標",
     ["Also show count outside raids"] = "在團隊副本外也顯示計數",
-    ["Outside raids Temporal Anomaly often hits fewer than 5, so the count reads high."] = "團隊副本外時間異常常常打不滿 5 個，計數會偏高。",
+    ["Outside raids the count reads high."] = "副本外時空畸體常打不滿 5 人，計數偏高。",
     ["empowered, settled on release"] = "蓄力法術，鬆手才結算",
     ["Grants an extra Echo target"] = "使下一個 Echo 多一個目標",
     ["stacks max"] = "層上限",
@@ -840,7 +831,7 @@ local defaults = {
     pulse = true,
     sound = true,
     soundChannel = "Master",
-    oncePerCast = true,
+    oncePerCast = false,
     repeatSeconds = 1,
   },
 }
@@ -2606,11 +2597,6 @@ controls.hideMinimapCheck:SetScript("OnClick", function(self)
   end
 end)
 
-local minimapHelp = generalPage:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-minimapHelp:SetPoint("TOP", 0, -284)
-minimapHelp:SetText(L["Tip: drag the minimap button to reposition it."])
-minimapHelp:SetTextColor(0.72, 0.72, 0.72)
-
 CreateCenteredSectionTitle(stylePage, L["Font"], -8)
 
 controls.fontDropdown = CreateFrame("Frame", "SeaCatEchoTrackerFontDropdown", stylePage, "UIDropDownMenuTemplate")
@@ -2750,7 +2736,7 @@ local countScopeHelp = textPage:CreateFontString(nil, "OVERLAY", "GameFontDisabl
 countScopeHelp:SetPoint("TOP", 0, -214)
 countScopeHelp:SetWidth(300)
 countScopeHelp:SetJustifyH("CENTER")
-countScopeHelp:SetText(L["Outside raids Temporal Anomaly often hits fewer than 5, so the count reads high."])
+countScopeHelp:SetText(L["Outside raids the count reads high."])
 countScopeHelp:SetTextColor(0.72, 0.72, 0.72)
 
 CreateCenteredSectionTitle(textPage, L["Timer Text"], -240)
