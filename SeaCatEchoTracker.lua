@@ -70,6 +70,59 @@ local CONSUME_SPELLS = {
   [355936] = "always",   -- Dream Breath
   [LIVING_FLAME_SPELL_ID] = "friendly",
 }
+
+-- A talent can replace a spell with one that has a different spellID while it
+-- keeps behaving the same: 1291616 turns Temporal Anomaly into another spell
+-- that still seeds 5 Echoes. The cast events then report an ID no table above
+-- knows, and the cast goes untracked.
+--
+-- Rather than chase each replacement by hand, ask the game what every
+-- configured spell currently resolves to and register that too. These lookups
+-- are what the event handlers read; the tables above stay the authored source.
+local applyLookup = {}
+local consumeLookup = {}
+local empoweredLookup = {}
+local extraTargetLookup = {}
+
+local function GetOverrideFor(spellID)
+  if C_Spell and C_Spell.GetOverrideSpell then
+    return C_Spell.GetOverrideSpell(spellID)
+  end
+  if FindSpellOverrideByID then
+    return FindSpellOverrideByID(spellID)
+  end
+  return nil
+end
+
+local function RefreshSpellLookups()
+  wipe(applyLookup)
+  wipe(consumeLookup)
+  wipe(empoweredLookup)
+  wipe(extraTargetLookup)
+
+  local function register(lookup, spellID, value)
+    lookup[spellID] = value
+
+    local override = GetOverrideFor(spellID)
+    if override and override ~= spellID then
+      lookup[override] = value
+    end
+  end
+
+  for spellID, kind in pairs(APPLY_SPELLS) do
+    register(applyLookup, spellID, kind)
+  end
+  for spellID, kind in pairs(CONSUME_SPELLS) do
+    register(consumeLookup, spellID, kind)
+  end
+  for spellID in pairs(EMPOWERED_SPELLS) do
+    register(empoweredLookup, spellID, true)
+  end
+  register(extraTargetLookup, EMERALD_BLOSSOM_SPELL_ID, true)
+end
+
+RefreshSpellLookups()
+
 local unpackFunc = unpack or table.unpack
 
 -- Aura timing fields carry SecretWhenAurasRestricted, so in combat/encounters/
@@ -2180,7 +2233,7 @@ do
   local function ResolveCast(spellID, target)
     local now = GetTime()
 
-    if spellID == EMERALD_BLOSSOM_SPELL_ID then
+    if extraTargetLookup[spellID] then
       PruneExtraTargetStacks(now)
 
       if extraTargetStacks < EXTRA_TARGET_MAX_STACKS then
@@ -2192,7 +2245,7 @@ do
       return
     end
 
-    local applyKind = APPLY_SPELLS[spellID]
+    local applyKind = applyLookup[spellID]
     if applyKind then
       local expiry = now + GetEchoDuration()
 
@@ -2227,7 +2280,7 @@ do
       return
     end
 
-    local consumeKind = CONSUME_SPELLS[spellID]
+    local consumeKind = consumeLookup[spellID]
     if not consumeKind then
       return
     end
@@ -2249,7 +2302,7 @@ do
     -- An empowered spell has only started charging at this point; acting now
     -- would consume Echo even if the channel is later cancelled. Its target
     -- mapping is deliberately left in place for EMPOWER_STOP to pick up.
-    if EMPOWERED_SPELLS[spellID] then
+    if empoweredLookup[spellID] then
       return
     end
 
@@ -3198,6 +3251,17 @@ SlashCmdList["SEACATECHOTRACKER"] = function(msg)
       return "|cffff5555" .. spellID .. "|r <" .. L["unknown spell"] .. ">"
     end
 
+    -- A talent-replaced spell casts under a different ID, so show what each
+    -- configured spell currently resolves to.
+    local function describeWithOverride(spellID)
+      local line = describe(spellID)
+      local override = GetOverrideFor(spellID)
+      if override and override ~= spellID then
+        line = line .. "  |cff9ecb70->|r " .. describe(override)
+      end
+      return line
+    end
+
     local duration = ns.GetEchoDuration and ns.GetEchoDuration() or ECHO_DURATION_FALLBACK
     local calibrated = type(SeaCatEchoTrackerDB.echoDuration) == "number" and SeaCatEchoTrackerDB.echoDuration > 0
 
@@ -3206,7 +3270,7 @@ SlashCmdList["SEACATECHOTRACKER"] = function(msg)
 
     print("|cff70C0F5SeaCat Echo Tracker|r " .. L["Applies Echo"] .. ":")
     for spellID in pairs(APPLY_SPELLS) do
-      print("  " .. describe(spellID))
+      print("  " .. describeWithOverride(spellID))
     end
 
     print("|cff70C0F5SeaCat Echo Tracker|r " .. L["Consumes Echo"] .. ":")
@@ -3218,11 +3282,11 @@ SlashCmdList["SEACATECHOTRACKER"] = function(msg)
       if EMPOWERED_SPELLS[spellID] then
         suffix = suffix .. "  (" .. L["empowered, settled on release"] .. ")"
       end
-      print("  " .. describe(spellID) .. suffix)
+      print("  " .. describeWithOverride(spellID) .. suffix)
     end
 
     print("|cff70C0F5SeaCat Echo Tracker|r " .. L["Grants an extra Echo target"] .. ":")
-    print("  " .. describe(EMERALD_BLOSSOM_SPELL_ID)
+    print("  " .. describeWithOverride(EMERALD_BLOSSOM_SPELL_ID)
       .. "  (" .. EXTRA_TARGET_MAX_STACKS .. " " .. L["stacks max"] .. ", "
       .. EXTRA_TARGET_DURATION .. "s)")
     return
@@ -3261,11 +3325,20 @@ SlashCmdList["SEACATECHOTRACKER"] = function(msg)
   print("|cff70C0F5" .. L["Alerts"] .. "|r " .. L["Alerts are configurable in the Alerts tab."])
   print("|cff70C0F5" .. L["Echo Tracker"] .. "|r " .. L["Also reachable from ESC > Options > AddOns."])
 end
+-- Spell overrides are not resolvable until the spellbook exists, and they change
+-- whenever the player swaps talents or specs.
+local overrideWatcher = CreateFrame("Frame")
+overrideWatcher:RegisterEvent("SPELLS_CHANGED")
+overrideWatcher:RegisterEvent("TRAIT_CONFIG_UPDATED")
+overrideWatcher:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+overrideWatcher:SetScript("OnEvent", RefreshSpellLookups)
+
 local startupRefresh = CreateFrame("Frame")
 startupRefresh:RegisterEvent("PLAYER_LOGIN")
 startupRefresh:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 startupRefresh:SetScript("OnEvent", function(self, event)
+  RefreshSpellLookups()
   EnsureAlertSettings()
 
   if minimapButton then

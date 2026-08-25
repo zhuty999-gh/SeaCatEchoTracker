@@ -81,6 +81,14 @@ CreateFrame("AuraContainer", nil, parent, "CustomAuraContainerTemplate")
 | `364343` | Echo | 单目标 |
 | `373861` | Temporal Anomaly（时空畸体） | **最多 5 个盟友**，球飞行途中逐个施加 |
 
+#### 天赋替换法术
+
+天赋会把一个法术**替换成另一个 spellID**，行为却不变：`1291616` 就把时空畸体换成另一个法术，照样给 5 个人上 Echo。此时施法事件报的是替换后的 ID，写死的法术表认不出来，这一次施放就整个丢失。
+
+不逐个去追这些替换 ID，而是启动时和天赋变动时用 `C_Spell.GetOverrideSpell` 问游戏「这个法术现在实际是哪个」，把结果一并注册。三张表（施加 / 消耗 / 蓄力）和翡翠绽放都走同一套解析，所以以后任何替换类天赋都自动兼容。
+
+刷新时机：`SPELLS_CHANGED`、`TRAIT_CONFIG_UPDATED`、`PLAYER_SPECIALIZATION_CHANGED`。文件加载时法术书还没就绪，所以那一次只会注册基础 ID，真正的解析发生在登录之后。用 `/sce spells` 可以看到每个法术当前解析成了什么。
+
 ### 3.2 额外目标天赋（1242031）
 
 施放 **Emerald Blossom（355913）** 会获得 buff `1242759`,每层使下一个 Echo 额外命中一个盟友。**最多 2 层,持续 15 秒。**
