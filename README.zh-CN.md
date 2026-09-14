@@ -49,6 +49,7 @@ Echo 的真实持续时间在**战斗外自动校准**（此时光环仍可读�
 | --- | --- |
 | `/sce` 或 `/seacatechotracker` | 打开/关闭设置面板 |
 | `/sce spells` | 打印法术表及其实际名称，用于核对 ID |
+| `/sce stasis` | 打印 Stasis 储存、Twin Echo 层数和 Echo 数量 |
 | `/sce show` / `/sce hide` | 切换「始终显示」 |
 | `/sce unlock` / `/sce lock` | 解锁/锁定，用于移动位置 |
 | `/sce reset` | 恢复默认设置（保留已校准的持续时间） |

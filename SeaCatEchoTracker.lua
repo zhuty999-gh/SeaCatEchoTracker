@@ -58,8 +58,13 @@ local APPLY_SPELLS = {
 -- must be settled on UNIT_SPELLCAST_EMPOWER_STOP instead, which reports whether
 -- the channel actually completed. Any empowered spell added to the tables below
 -- has to be listed here too, or cancelling its channel will still consume Echo.
+-- Spiritbloom does not consume Echo, but it is empowered and Stasis-eligible, so
+-- it has to be listed or a cancelled channel would still be banked as stored.
 local EMPOWERED_SPELLS = {
   [355936] = true, -- Dream Breath
+  [382614] = true, -- Dream Breath (Font of Magic)
+  [367226] = true, -- Spiritbloom
+  [382731] = true, -- Spiritbloom (Font of Magic)
 }
 
 -- All active Echoes are consumed together, so these only need to clear the set.
@@ -68,7 +73,55 @@ local CONSUME_SPELLS = {
   [1256581] = "always",  -- verified in-game via /et spells
   [360995] = "always",   -- Verdant Embrace
   [355936] = "always",   -- Dream Breath
+  [382614] = "always",   -- Dream Breath (Font of Magic)
+  [355941] = "always",   -- Dream Breath heal; Stasis copies may fire this ID
   [LIVING_FLAME_SPELL_ID] = "friendly",
+}
+
+-- Stasis (370537) duplicates the next 3 helpful spells. Recasting the ready
+-- version (370562), or letting the 30s window expire, unleashes them in the
+-- same order. Those copies do not reliably go through the player's normal
+-- SUCCEEDED / EMPOWER_STOP path — Dream Breath in particular is instant on
+-- release, so EMPOWER_STOP never fires and the consume is lost.
+--
+-- The bank is inferred from our own completed casts after 370537. On release
+-- the stored sequence is replayed through ResolveCast, which is also what
+-- makes Temporal Anomaly after a stored Dream Breath apply fresh Echoes.
+local STASIS_STORE_SPELL_ID = 370537
+local STASIS_RELEASE_SPELL_ID = 370562
+local STASIS_CAPACITY = 3
+local STASIS_RELEASE_WINDOW = 30
+local STASIS_RELEASE_IGNORE = 2.5
+
+-- Helpful spells Stasis will actually store. Damage and major CDs (Rewind,
+-- Dream Flight, Hover, ...) are absent on purpose so they do not fill a slot.
+local STASIS_SPELLS = {
+  [ECHO_SPELL_ID] = true,
+  [TEMPORAL_ANOMALY_SPELL_ID] = true,
+  [LIVING_FLAME_SPELL_ID] = true,
+  [EMERALD_BLOSSOM_SPELL_ID] = true,
+  [366155] = true,  -- Reversion
+  [1256581] = true, -- Merithra's Blessing
+  [360995] = true,  -- Verdant Embrace
+  [355936] = true,  -- Dream Breath
+  [382614] = true,  -- Dream Breath (Font of Magic)
+  [367226] = true,  -- Spiritbloom
+  [382731] = true,  -- Spiritbloom (Font of Magic)
+  [360823] = true,  -- Naturalize
+  [374251] = true,  -- Cauterizing Flame
+  [431443] = true,  -- Chrono Flames
+  [443328] = true,  -- Engulf
+}
+
+-- Released copies sometimes land on a related effect ID rather than the
+-- ability we stored. Those have to be ignored during the replay window or a
+-- late Dream Breath heal would wipe Echoes that Temporal Anomaly just applied.
+local STASIS_RELEASE_ALIASES = {
+  [355936] = { 355941, 382614 },
+  [382614] = { 355936, 355941 },
+  [355941] = { 355936, 382614 },
+  [367226] = { 367230, 382731 },
+  [382731] = { 367226, 367230 },
 }
 
 -- A talent can replace a spell with one that has a different spellID while it
@@ -83,6 +136,7 @@ local applyLookup = {}
 local consumeLookup = {}
 local empoweredLookup = {}
 local extraTargetLookup = {}
+local stasisEligibleLookup = {}
 
 local function GetOverrideFor(spellID)
   if C_Spell and C_Spell.GetOverrideSpell then
@@ -99,6 +153,7 @@ local function RefreshSpellLookups()
   wipe(consumeLookup)
   wipe(empoweredLookup)
   wipe(extraTargetLookup)
+  wipe(stasisEligibleLookup)
 
   local function register(lookup, spellID, value)
     lookup[spellID] = value
@@ -117,6 +172,9 @@ local function RefreshSpellLookups()
   end
   for spellID in pairs(EMPOWERED_SPELLS) do
     register(empoweredLookup, spellID, true)
+  end
+  for spellID in pairs(STASIS_SPELLS) do
+    register(stasisEligibleLookup, spellID, true)
   end
   register(extraTargetLookup, EMERALD_BLOSSOM_SPELL_ID, true)
 end
@@ -716,6 +774,10 @@ elseif locale == "zhCN" then
     ["Outside raids the count reads high."] = "副本外时空畸体常打不满 5 人，计数偏高。",
     ["empowered, settled on release"] = "蓄力法术，松手才结算",
     ["Grants an extra Echo target"] = "使下一个 Echo 多一个目标",
+    ["Stasis"] = "静滞",
+    ["starts storing"] = "开始储存",
+    ["releases stored spells"] = "释放已储存法术",
+    ["show stasis bank"] = "显示静滞储存",
     ["stacks max"] = "层上限",
     ["Default"] = "默认",
     ["Open Settings"] = "打开设置",
@@ -805,6 +867,10 @@ elseif locale == "zhTW" then
     ["Outside raids the count reads high."] = "副本外時空畸體常打不滿 5 人，計數偏高。",
     ["empowered, settled on release"] = "蓄力法術，鬆手才結算",
     ["Grants an extra Echo target"] = "使下一個 Echo 多一個目標",
+    ["Stasis"] = "靜滯",
+    ["starts storing"] = "開始儲存",
+    ["releases stored spells"] = "釋放已儲存法術",
+    ["show stasis bank"] = "顯示靜滯儲存",
     ["stacks max"] = "層上限",
     ["Default"] = "預設",
     ["Open Settings"] = "開啟設定",
@@ -2034,6 +2100,19 @@ do
   local extraTargetStacks = 0
   local extraTargetExpiry = 0
 
+  -- Stasis bank: completed helpful casts after 370537, replayed on 370562.
+  local stasisStored = {}
+  local stasisStoring = false
+  local stasisReady = false
+  local stasisGeneration = 0
+  local stasisReleaseUntil = 0
+  local stasisSkipBlossomCopies = 0
+  local stasisIgnoreIDs = {}
+  local lastExtraTargetGrant = 0
+  local lastExtraTargetWhileReady = false
+  local lastExtraTargetPlayerInitiated = true
+  local lastBlossomSentAt = 0
+
   local function GetEchoDuration()
     local calibrated = SeaCatEchoTrackerDB.echoDuration
     if type(calibrated) == "number" and calibrated > 0 then
@@ -2230,10 +2309,38 @@ do
     return target
   end
 
-  local function ResolveCast(spellID, target)
+  local function ResolveCast(spellID, target, fromStasis, playerInitiated, bankWasReady)
     local now = GetTime()
+    -- nil means "treat as a real press" so store-phase / empower paths stay safe.
+    local initiated = playerInitiated ~= false
 
     if extraTargetLookup[spellID] then
+      -- Pressed blossom (including the one stored into Stasis) grants Twin
+      -- Echo. The unleashed copy does not: it often SUCCEEDs before 370562,
+      -- and it has no UNIT_SPELLCAST_SENT from the player.
+      if fromStasis then
+        return
+      end
+
+      local unleashing = stasisReady or stasisSkipBlossomCopies > 0 or stasisReleaseUntil > now
+      if unleashing and not initiated then
+        if stasisSkipBlossomCopies > 0 then
+          stasisSkipBlossomCopies = stasisSkipBlossomCopies - 1
+        end
+        return
+      end
+
+      if stasisSkipBlossomCopies > 0 then
+        stasisSkipBlossomCopies = stasisSkipBlossomCopies - 1
+        return
+      end
+
+      -- One press can report more than one spellID; do not credit two stacks.
+      if lastExtraTargetGrant > 0 and (now - lastExtraTargetGrant) < 0.3 then
+        extraTargetExpiry = now + EXTRA_TARGET_DURATION
+        return
+      end
+
       PruneExtraTargetStacks(now)
 
       if extraTargetStacks < EXTRA_TARGET_MAX_STACKS then
@@ -2242,6 +2349,9 @@ do
 
       -- Refreshed even at max stacks: re-casting extends the existing buff.
       extraTargetExpiry = now + EXTRA_TARGET_DURATION
+      lastExtraTargetGrant = now
+      lastExtraTargetWhileReady = bankWasReady == true
+      lastExtraTargetPlayerInitiated = initiated
       return
     end
 
@@ -2298,7 +2408,208 @@ do
     end
   end
 
+  local function MarkStasisIgnore(spellID)
+    if not spellID then
+      return
+    end
+
+    stasisIgnoreIDs[spellID] = true
+
+    local aliases = STASIS_RELEASE_ALIASES[spellID]
+    if aliases then
+      for i = 1, #aliases do
+        stasisIgnoreIDs[aliases[i]] = true
+      end
+    end
+  end
+
+  local function IsBlossomSpell(spellID)
+    if extraTargetLookup[spellID] or spellID == EMERALD_BLOSSOM_SPELL_ID then
+      return true
+    end
+    local override = GetOverrideFor(EMERALD_BLOSSOM_SPELL_ID)
+    if override and override == spellID then
+      return true
+    end
+    local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(spellID)
+    local blossom = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(EMERALD_BLOSSOM_SPELL_ID)
+    return info and blossom and info.name and info.name == blossom.name
+  end
+
+  local function UndoCopyTwinEchoGrant()
+    -- Copies can SUCCEEDED before 370562, so Twin Echo may already have
+    -- been credited. Roll that back if it was a no-SENT grant while ready.
+    if lastExtraTargetGrant <= 0 or not lastExtraTargetWhileReady then
+      return
+    end
+    if lastExtraTargetPlayerInitiated then
+      return
+    end
+    if (GetTime() - lastExtraTargetGrant) >= 2 then
+      return
+    end
+    if extraTargetStacks > 0 then
+      extraTargetStacks = extraTargetStacks - 1
+      if extraTargetStacks == 0 then
+        extraTargetExpiry = 0
+      end
+    end
+    lastExtraTargetGrant = 0
+    lastExtraTargetWhileReady = false
+  end
+
+  local function StartStoring()
+    -- A release press can also report 370537. Do not start a new bank or
+    -- drop pending blossom-copy skips; that was letting the unleashed
+    -- blossom grant Twin Echo.
+    if stasisSkipBlossomCopies > 0 or stasisReleaseUntil > GetTime() then
+      return
+    end
+
+    stasisGeneration = stasisGeneration + 1
+    stasisStoring = true
+    stasisReady = false
+    wipe(stasisStored)
+    wipe(stasisIgnoreIDs)
+  end
+
+  local function ReleaseStasis()
+    -- A second 370537/370562 on the same press used to wipe an empty bank
+    -- and clear the Twin Echo skip, so the live blossom copy granted a stack.
+    if not stasisReady and #stasisStored == 0 then
+      return
+    end
+
+    stasisGeneration = stasisGeneration + 1
+    stasisStoring = false
+    stasisReady = false
+
+    local replay = stasisStored
+    stasisStored = {}
+    wipe(stasisIgnoreIDs)
+
+    for i = 1, #replay do
+      MarkStasisIgnore(replay[i].spellID)
+      if IsBlossomSpell(replay[i].spellID) then
+        stasisSkipBlossomCopies = stasisSkipBlossomCopies + 1
+      end
+    end
+
+    stasisReleaseUntil = GetTime() + STASIS_RELEASE_IGNORE
+    UndoCopyTwinEchoGrant()
+
+    -- Replay in stored order so a leading Dream Breath consumes Echoes that
+    -- are already out, and a trailing Temporal Anomaly can then apply new ones.
+    for i = 1, #replay do
+      ResolveCast(replay[i].spellID, replay[i].target, true)
+    end
+  end
+
+  local function RememberStasisSpell(spellID, target)
+    if not stasisStoring or #stasisStored >= STASIS_CAPACITY then
+      return false
+    end
+
+    if not stasisEligibleLookup[spellID] then
+      return false
+    end
+
+    stasisStored[#stasisStored + 1] = { spellID = spellID, target = target }
+
+    if #stasisStored >= STASIS_CAPACITY then
+      stasisStoring = false
+      stasisReady = true
+      stasisGeneration = stasisGeneration + 1
+      local gen = stasisGeneration
+      if C_Timer and C_Timer.After then
+        C_Timer.After(STASIS_RELEASE_WINDOW, function()
+          if gen == stasisGeneration and stasisReady then
+            ReleaseStasis()
+          end
+        end)
+      end
+    end
+
+    return true
+  end
+
+  local function HandleStasisCast(spellID)
+    -- The action-bar override can still report 370537 on the release press.
+    if spellID == STASIS_RELEASE_SPELL_ID or stasisReady then
+      ReleaseStasis()
+      return
+    end
+
+    if spellID == STASIS_STORE_SPELL_ID and not stasisStoring then
+      StartStoring()
+    end
+  end
+
+  local function IsStasisSpell(spellID)
+    return spellID == STASIS_STORE_SPELL_ID or spellID == STASIS_RELEASE_SPELL_ID
+  end
+
+  local function ShouldIgnoreReleasedCopy(spellID)
+    -- Blossom copies are not ignored here. They must reach ResolveCast so
+    -- the skip counter can eat exactly one Twin Echo grant.
+    if extraTargetLookup[spellID] then
+      return false
+    end
+    return stasisReleaseUntil > GetTime() and stasisIgnoreIDs[spellID]
+  end
+
+  local function OnSpellComplete(spellID, target, playerInitiated)
+    -- Capture before Remember: the 3rd stored blossom flips ready, and that
+    -- grant must not look like an unleashed copy.
+    local wasReady = stasisReady
+
+    -- Unleashed copies often fire before 370562. A helpful spell with no
+    -- player SENT while the bank is ready is the dump starting.
+    if wasReady and playerInitiated == false then
+      ReleaseStasis()
+    end
+
+    -- Ignore apply/consume copies so a late Dream Breath cannot wipe Echoes
+    -- a stored Temporal Anomaly just applied.
+    if ShouldIgnoreReleasedCopy(spellID) then
+      return
+    end
+
+    RememberStasisSpell(spellID, target)
+    ResolveCast(spellID, target, false, playerInitiated, wasReady)
+  end
+
+  ns.PrintStasisDebug = function()
+    local status
+    if stasisReady then
+      status = "ready"
+    elseif stasisStoring then
+      status = "storing"
+    else
+      status = "idle"
+    end
+
+    print("|cff70C0F5SeaCat Echo Tracker|r Stasis: " .. status
+      .. "  " .. #stasisStored .. "/" .. STASIS_CAPACITY
+      .. "  Twin Echo stacks=" .. extraTargetStacks
+      .. "  skipBlossom=" .. stasisSkipBlossomCopies
+      .. "  Echoes=" .. CountEchoes())
+
+    for i = 1, #stasisStored do
+      local entry = stasisStored[i]
+      local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(entry.spellID)
+      local name = (info and info.name) or "?"
+      local target = type(entry.target) == "string" and entry.target or "-"
+      print("  " .. i .. ". " .. entry.spellID .. " " .. name .. "  →  " .. target)
+    end
+  end
+
   local function OnCastSucceeded(castGUID, spellID)
+    if IsStasisSpell(spellID) then
+      HandleStasisCast(spellID)
+      return
+    end
+
     -- An empowered spell has only started charging at this point; acting now
     -- would consume Echo even if the channel is later cancelled. Its target
     -- mapping is deliberately left in place for EMPOWER_STOP to pick up.
@@ -2306,7 +2617,10 @@ do
       return
     end
 
-    ResolveCast(spellID, TakeTarget(castGUID))
+    local hadSent = pendingTargets[castGUID] ~= nil
+    local recentBlossomSent = lastBlossomSentAt > 0 and (GetTime() - lastBlossomSentAt) < 0.5
+    local playerInitiated = hadSent or (IsBlossomSpell(spellID) and recentBlossomSent)
+    OnSpellComplete(spellID, TakeTarget(castGUID), playerInitiated)
   end
 
   local function OnEmpowerStop(castGUID, spellID, complete)
@@ -2320,7 +2634,7 @@ do
 
     -- Cancelled or interrupted mid-charge: the spell never went off.
     if complete then
-      ResolveCast(spellID, target)
+      OnSpellComplete(spellID, target, true)
     end
   end
 
@@ -2334,9 +2648,12 @@ do
     if event == "UNIT_SPELLCAST_SENT" then
       -- Payload order differs from SUCCEEDED: unit, target, castGUID, spellID.
       -- SENT also cannot be unit-filtered, so the check happens here.
-      local unit, target, castGUID = ...
+      local unit, target, castGUID, sentSpellID = ...
       if unit == "player" and castGUID then
         RememberTarget(castGUID, target)
+        if sentSpellID and IsBlossomSpell(sentSpellID) then
+          lastBlossomSentAt = GetTime()
+        end
       end
       return
     end
@@ -3289,6 +3606,17 @@ SlashCmdList["SEACATECHOTRACKER"] = function(msg)
     print("  " .. describeWithOverride(EMERALD_BLOSSOM_SPELL_ID)
       .. "  (" .. EXTRA_TARGET_MAX_STACKS .. " " .. L["stacks max"] .. ", "
       .. EXTRA_TARGET_DURATION .. "s)")
+
+    print("|cff70C0F5SeaCat Echo Tracker|r " .. L["Stasis"] .. ":")
+    print("  " .. describe(STASIS_STORE_SPELL_ID) .. "  (" .. L["starts storing"] .. ")")
+    print("  " .. describe(STASIS_RELEASE_SPELL_ID) .. "  (" .. L["releases stored spells"] .. ")")
+    return
+  end
+
+  if msg == "stasis" then
+    if ns.PrintStasisDebug then
+      ns.PrintStasisDebug()
+    end
     return
   end
 
@@ -3321,6 +3649,7 @@ SlashCmdList["SEACATECHOTRACKER"] = function(msg)
   print("|cff70C0F5/sce lock|r - " .. L["lock tracker frame"])
   print("|cff70C0F5/sce reset|r - " .. L["reset settings to defaults"])
   print("|cff70C0F5/sce spells|r - " .. L["show spell table self-check"])
+  print("|cff70C0F5/sce stasis|r - " .. L["show stasis bank"])
   print("|cff70C0F5/seacatechotracker|r - " .. L["same as /sce, if you prefer the full name"])
   print("|cff70C0F5" .. L["Alerts"] .. "|r " .. L["Alerts are configurable in the Alerts tab."])
   print("|cff70C0F5" .. L["Echo Tracker"] .. "|r " .. L["Also reachable from ESC > Options > AddOns."])

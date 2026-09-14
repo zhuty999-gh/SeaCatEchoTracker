@@ -70,6 +70,7 @@ under default settings.
 | --- | --- |
 | `/sce` or `/seacatechotracker` | Toggle settings |
 | `/sce spells` | Print the spell table with resolved names, to verify IDs |
+| `/sce stasis` | Print the Stasis bank, Twin Echo stacks, and Echo count |
 | `/sce show` / `/sce hide` | Toggle always-show |
 | `/sce unlock` / `/sce lock` | Move the tracker |
 | `/sce reset` | Reset to defaults (keeps the calibrated duration) |
